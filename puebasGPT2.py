@@ -19,11 +19,12 @@ tokenizer.pad_token = tokenizer.eos_token
 # Texto de entrada
 input_texts = [
     "Tell me the capital of Spain",
-    "I just returned from the greatest summer vacation! It was so fantastic, I never wanted it to end. I spent eight days in Paris, France. My best friends, Henry and Steve, went with me. We had a beautiful hotel room in the Latin Quarter, and it wasn’t even expensive. We had a balcony with a wonderful view.",
-    "Cual es la capital de España"
+    "I just returned from the greatest summer vacation!",
+    "Cual es la capital de España",
+    "2+3="
 ]
 inputs = tokenizer(input_texts, return_tensors="pt", padding=True, padding_side='left',truncation=True, return_attention_mask=True)
-print(inputs)
+
 # %%
 
 # Generar texto
@@ -31,12 +32,46 @@ print(inputs)
 outputs = model.generate(
     input_ids=inputs["input_ids"],
     attention_mask=inputs["attention_mask"],  
-    max_length=75,  
+    max_length=50,  
     num_return_sequences=1,  
 )
-print(outputs)
+
 # %%
 # Decodificar y mostrar el texto generado
 generated_texts = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-print(generated_texts)
+# Mostrar los textos generados
+for i, text in enumerate(generated_texts):
+    print(f"Input {i+1}: {input_texts[i]}")
+    print(f"Generated Text {i+1}: {text}")
+    print("-" * 50)
+
 # %%
+
+# Vemos que este modelo no responde de la forma mas deseada además tiende a ser repetitivo. Esto ultimo podemos 
+# mejorarlo introduciendo un poco de aleatoriedad en la generacion de tokens
+
+# %%
+
+# Generar texto
+
+outputs = model.generate(
+    input_ids=inputs["input_ids"],
+    attention_mask=inputs["attention_mask"],  
+    max_length=50,  
+    do_sample=True,  # Habilitar sampling
+    top_k=50,  # Limitar la selección a los 50 tokens más probables
+    num_return_sequences=1,  
+)
+# %%
+# Decodificar y mostrar el texto generado
+generated_texts = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+# Mostrar los textos generados
+for i, text in enumerate(generated_texts):
+    print(f"Input {i+1}: {input_texts[i]}")
+    print(f"Generated Text {i+1}: {text}")
+    print("-" * 50)
+
+# %%
+
+# Ya no es tan repetitivo pero sigue sin ser satisfactorio, además que ahora se ve claramente que el modelo  
+# ha sido en un corpus exclusivamente en ingles luego no responde de la forma deseada a los inputs en castellano
