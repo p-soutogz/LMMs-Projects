@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+# He organizado el codigo en celdas para mayor comodidad
+
 # %%
 model_name = "openai-community/gpt2"
 
