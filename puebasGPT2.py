@@ -74,4 +74,4 @@ for i, text in enumerate(generated_texts):
 # %%
 
 # Ya no es tan repetitivo pero sigue sin ser satisfactorio, además que ahora se ve claramente que el modelo  
-# ha sido en un corpus exclusivamente en ingles luego no responde de la forma deseada a los inputs en castellano
+# ha sido entrenado en un corpus exclusivamente en ingles luego no responde de la forma deseada a los inputs en castellano
