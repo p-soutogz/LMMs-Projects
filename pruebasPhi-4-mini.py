@@ -77,7 +77,7 @@ for i, text in enumerate(generated_texts):
 # %%
 ##Vamos ahora a cargar el modelo en la GPU para aguilizar los calculos
 
-# Definir el dispositivo (GPU si está disponible, de lo contrario CPU)
+# Definir el dispositivo (GPU)
 device = "cuda" 
 
 ruta_modelo = "C:/Users/pablo/Phi-4-mini"
