@@ -17,8 +17,8 @@ tokenizer.pad_token = tokenizer.eos_token
 model.config.pad_token_id = tokenizer.pad_token_id
 
 #Guardamos el modelo y el tokenizador localmente
-model.save_pretrained("C:/Users/pablo/GPT2")
-tokenizer.save_pretrained("C:/Users/pablo/tokenizadorGPT2")
+model.save_pretrained("C:/Users/pablo/ModelosLLM/GPT2")
+tokenizer.save_pretrained("C:/Users/pablo/ModelosLLM/tokenizadorGPT2")
 # %%
 # Texto de entrada
 input_texts = [

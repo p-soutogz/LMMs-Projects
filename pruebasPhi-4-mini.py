@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
 
 # He organizado el codigo en celdas para mayor comodidad
 
@@ -8,6 +9,9 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 #en un data base orientado a la generacion de texto
 
 #No recomiendo ejecutar el codigo, es bastante exigente
+
+ruta_modelo = "C:/Users/pablo/ModelosLLM/Phi-4-mini"
+ruta_tokenizador = "C:/Users/pablo/ModelosLLM/Phi-4-mini-tokenizador"
 
 # %%
 model_name = "unsloth/Phi-4-mini-instruct"
@@ -23,8 +27,16 @@ tokenizer.pad_token = tokenizer.eos_token
 model.config.pad_token_id = tokenizer.pad_token_id
 
 #Guardamos el modelo y el tokenizador localmente
-model.save_pretrained("C:/Users/pablo/Phi-4-mini")
-tokenizer.save_pretrained("C:/Users/pablo/Phi-4-mini-tokenizador")
+
+model.save_pretrained(ruta_modelo)
+tokenizer.save_pretrained(ruta_tokenizador)
+# %%
+
+# Cargar el tokenizador y el modelo si ya lo tenemos gurdado localmente
+
+tokenizer = AutoTokenizer.from_pretrained(ruta_modelo)
+model = AutoModelForCausalLM.from_pretrained(ruta_tokenizador)
+
 
 # %%
 # Texto de entrada
@@ -75,15 +87,23 @@ for i, text in enumerate(generated_texts):
 #Claramente el modelo responde mucho mejor que GPT2, además este si que esta entrenado tambien en español
 
 # %%
+
+# Me esta dando fallos la libreria dynamo por lo que la voy a desabilitar, si a ti no te da problema puedes omitir estas lineas
+
+import torch._dynamo
+torch._dynamo.config.suppress_errors = True
+torch._dynamo.config.disable = True
+
+# %%
 ##Vamos ahora a cargar el modelo en la GPU para aguilizar los calculos
 
-# Definir el dispositivo (GPU)
-device = "cuda" 
+# Definir el dispositivo 
 
-ruta_modelo = "C:/Users/pablo/Phi-4-mini"
-ruta_tokenizador = "C:/Users/pablo/Phi-4-mini-tokenizador"
+
+device = "cuda"  if torch.cuda.is_available() else "cpu"
 
 # Cargar el tokenizador y el modelo en la GPU
+
 tokenizer = AutoTokenizer.from_pretrained(ruta_tokenizador)
 model = AutoModelForCausalLM.from_pretrained(ruta_modelo).to(device)
 # %%
@@ -94,7 +114,7 @@ input_texts = [
     "Cual es la capital de España",
     "2+3="
 ]
-inputs = tokenizer(input_texts, return_tensors="pt",padding=True, padding_side='left',truncation=True, return_attention_mask=True).to(device)
+inputs = tokenizer(input_texts, return_tensors="pt", padding=True, padding_side='left', truncation=True, return_attention_mask=True).to(device)
 
 # Generar texto
 outputs = model.generate(
