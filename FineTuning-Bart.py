@@ -23,7 +23,7 @@ tokenizer = AutoTokenizer.from_pretrained(model_name)
 model_base = AutoModelForSeq2SeqLM.from_pretrained(model_name).to(device)
 
 #Definimos un token para el padding
-tokenizer.pad_token = tokenizer.eos_token
+tokenizer.pad_token = '<PAD>'
 
 # Actualizar la configuración del modelo para que use el mismo token de padding
 model_base.config.pad_token_id = tokenizer.pad_token_id
@@ -60,7 +60,7 @@ eval_dataset = dataset["validation"]
 
 # Seleccionar una porción del dataset de entrenamiento
 
-train_dataset = train_dataset.select(range(int(0.001 * len(train_dataset))))
+train_dataset = train_dataset.select(range(int(0.01 * len(train_dataset))))
 test_dataset = test_dataset.select(range(int(0.01 * len(test_dataset))))
 eval_dataset = eval_dataset.select(range(int(0.01 * len(eval_dataset))))
 
@@ -73,7 +73,7 @@ def preprocess_function(examples):
     inputs = ["Summarize this article:\n "+ article + "Summary:\n" for article in examples["article"]]
 
     # Tokenizar los inputs y los targets
-    model_inputs = tokenizer(inputs, truncation=True,max_length=512, padding="max_length",return_tensors="pt")
+    model_inputs = tokenizer(inputs, truncation=True,max_length=1024, padding="max_length",return_tensors="pt")
     labels = tokenizer(examples["highlights"], truncation=True,max_length=250, padding="max_length",return_tensors="pt")
 
     
@@ -98,16 +98,13 @@ from transformers import Trainer, TrainingArguments
 
 # Definir los argumentos de entrenamiento
 training_args = TrainingArguments(
-    output_dir="./results",
     eval_strategy="epoch",
-    learning_rate=2e-5,
-    per_device_train_batch_size=2,
-    per_device_eval_batch_size=2,
+    learning_rate=3e-5,
+    per_device_train_batch_size=4,
+    per_device_eval_batch_size=4,
     num_train_epochs=1,
     weight_decay=0.01,
     save_total_limit=2,
-    save_steps=500,
-    logging_dir="./logs",
     fp16=torch.cuda.is_available(),  # Usar mixed precision si hay GPU disponible
     )
 
@@ -136,7 +133,7 @@ trainer_base.train()
 #Cargar el modelo
  
 model_FullFineTuning = AutoModelForSeq2SeqLM.from_pretrained("C:/Users/pablo/ModelosLLM/Bart-FT").to(device)
-
+tokenizer = AutoTokenizer.from_pretrained("C:/Users/pablo/ModelosLLM/tokenizadorBart-FT")
 
 # %%
 
@@ -171,7 +168,9 @@ trainer_ft = Trainer(
 results_base_model = trainer_base.evaluate(test_dataset)
 results_ft_model = trainer_ft.evaluate(test_dataset)
 
+print("Resultados modelo base:\n")
 print(results_base_model)
+print("Resultdos modelo finetuning:\n")
 print(results_ft_model)
 
 
@@ -181,26 +180,19 @@ print(results_ft_model)
 
 from evaluate import load
 
-eval_dataset = eval_dataset.select(range(10))
+eval_data = eval_dataset.select(range(50))
 
-# Cargar la métrica ROUGE
 rouge = load("rouge",token=True)
 
-# Función para calcular ROUGE
-def compute_rouge(predictions, references):
-    return rouge.compute(predictions=predictions, references=references)
-
-references = [example["highlights"] for example in eval_dataset]  
+references = [example["highlights"] for example in eval_data]  
 
 # %%
 def compute_predictions(data, model, tokenizer, device):
     predictions = []
     
-    # Procesar en lotes para mayor eficiencia
     for i in range(0, len(data)):
         articles = "Sumarize this article:\n"+data["article"][i]+ "Summary:\n"
-        
-        # Tokenizar el lote de artículos
+
         inputs = tokenizer(
             articles,
             return_tensors="pt",
@@ -208,8 +200,7 @@ def compute_predictions(data, model, tokenizer, device):
             truncation=True,
             max_length=512
         ).to(device)
-        
-        # Generar resúmenes
+
         summary_ids = model.generate(
             **inputs,
             max_new_tokens=250,
@@ -218,7 +209,6 @@ def compute_predictions(data, model, tokenizer, device):
             top_k=5
         )
         
-        # Decodificar los resúmenes
         summaries = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
         predictions.append(summaries)
     
@@ -226,15 +216,15 @@ def compute_predictions(data, model, tokenizer, device):
 
 
 # %%
-predictions_base = compute_predictions(eval_dataset,model_base, tokenizer, device)
-rouge_base = compute_rouge(predictions_base, references)
+predictions_base = compute_predictions(eval_data,model_base, tokenizer, device)
+rouge_base = rouge.compute(predictions=predictions_base, references=references)
 print("ROUGE del modelo base:", rouge_base)
 
 
 # %%
 
-predictions_tf = compute_predictions(eval_dataset,model_FullFineTuning, tokenizer, device)
-rouge_ft = compute_rouge(predictions_tf, references)
+predictions_tf = compute_predictions(eval_data,model_FullFineTuning, tokenizer, device)
+rouge_ft = rouge.compute(predictions=predictions_tf, references=references)
 print("ROUGE del modelo fine-tuneado:", rouge_ft)
 
 
