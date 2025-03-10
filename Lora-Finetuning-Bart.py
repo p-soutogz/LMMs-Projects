@@ -5,18 +5,13 @@ from datasets import load_dataset
 import torch
 from peft import get_peft_model, LoraConfig, TaskType
 
-# %% Deshabilitar dynamo si causa problemas
-import torch._dynamo
-torch._dynamo.config.suppress_errors = True
-torch._dynamo.config.disable = True
-
 #%% Cargar el tokenizador y el modelo
 model_name = "facebook/bart-large-cnn"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print("Device = ", device)
 
 tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForSeq2SeqLM.from_pretrained(model_name).to(device)
+base_model = AutoModelForSeq2SeqLM.from_pretrained(model_name).to(device)
 
 #%% Configurar LoRA
 peft_config = LoraConfig(
@@ -28,7 +23,7 @@ peft_config = LoraConfig(
 )
 
 #%% Aplicar LoRA al modelo
-peft_model = get_peft_model(model, peft_config)
+peft_model = get_peft_model(base_model, peft_config)
 peft_model.print_trainable_parameters()  
 
 #%% Cargar el dataset
@@ -54,8 +49,7 @@ train_dataset = train_dataset.remove_columns(["id", "highlights", "article"])
 
 #%% Configurar los argumentos de entrenamiento
 
-training_args = TrainingArguments(
-    output_dir="./results_lora",      
+training_args = TrainingArguments(      
     evaluation_strategy="epoch",    
     learning_rate=3e-5,               
     per_device_train_batch_size=4,   
@@ -81,3 +75,62 @@ trainer.train()
 #%% Guardar el modelo fine-tuned
 trainer.save_model("C:/Users/pablo/ModelosLLM/Bart-Lora-FT")
 tokenizer.save_pretrained("C:/Users/pablo/ModelosLLM/tokenizadorBart-Lora-FT")
+
+# %%
+## Vamos a compararlos usando la metrica ROUGE
+
+# Cargamos el modelo y el tokenizadpor si es necesario
+
+peft_model = AutoModelForSeq2SeqLM.from_pretrained("C:/Users/pablo/ModelosLLM/Bart-Lora-FT").to(device)
+tokenizer = AutoTokenizer.from_pretrained("C:/Users/pablo/ModelosLLM/tokenizadorBart-Lora-FT")
+
+
+# %%
+
+
+from evaluate import load
+
+rouge = load("rouge",token=True)
+
+references = [example["highlights"] for example in eval_dataset]  
+
+# %%
+def compute_predictions(data, model, tokenizer, device):
+    predictions = []
+    
+    for i in range(0, len(data)):
+        articles = "Sumarize this article:\n"+data["article"][i]+ "Summary:\n"
+
+        inputs = tokenizer(
+            articles,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=1024
+        ).to(device)
+
+        summary_ids = model.generate(
+            **inputs,
+            max_new_tokens=250,
+            num_return_sequences=1,
+            do_sample=True,
+            top_k=5
+        )
+        
+        summaries = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+        predictions.append(summaries)
+    
+    return predictions
+
+# %%
+
+predictions_lora = compute_predictions(eval_dataset,peft_model, tokenizer, device)
+rouge_lora = rouge.compute(predictions=predictions_lora, references=references)
+print("ROUGE del Lora_model:", rouge_lora)
+
+
+
+
+
+
+
