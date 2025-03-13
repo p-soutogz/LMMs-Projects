@@ -6,7 +6,7 @@ import torch
 from peft import get_peft_model, LoraConfig, TaskType
 
 #%% Cargar el tokenizador y el modelo
-model_name = "facebook/bart-large-cnn"
+model_name = "google/flan-t5-small"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print("Device = ", device)
 
@@ -27,25 +27,27 @@ peft_model = get_peft_model(base_model, peft_config)
 peft_model.print_trainable_parameters()  
 
 #%% Cargar el dataset
-dataset = load_dataset('abisee/cnn_dailymail', '3.0.0')
-train_dataset = dataset["train"].select(range(int(0.01 * len(dataset["train"]))))
-test_dataset = dataset["test"].select(range(int(0.01 * len(dataset["test"]))))
-eval_dataset = dataset["validation"].select(range(int(0.01 * len(dataset["validation"]))))
+dataset = load_dataset('gopalkalpande/bbc-news-summary')
+
+dataset_barajado = dataset["train"].shuffle(seed=42)
+indices = int(0.7 * len(dataset_barajado))
+
+train_dataset = dataset_barajado.select(range(indices))    
+eval_dataset = dataset_barajado.select(range(indices, len(dataset_barajado)))
 
 #%% Función de preprocesamiento
 def preprocess_function(examples):
-    inputs = ["Summarize this article:\n " + article + "Summary:\n" for article in examples["article"]]
+    inputs = ["Summarize this article:\n " + article + "Summary:\n" for article in examples["Articles"]]
     model_inputs = tokenizer(inputs, truncation=True, max_length=1024, padding="max_length", return_tensors="pt")
-    labels = tokenizer(examples["highlights"], truncation=True, max_length=250, padding="max_length", return_tensors="pt")
+    labels = tokenizer(examples["Summaries"], truncation=True, max_length=250, padding="max_length", return_tensors="pt")
     model_inputs["labels"] = labels["input_ids"]
     return model_inputs
 
 #%% Aplicar preprocesamiento
 train_dataset = train_dataset.map(preprocess_function, batched=True)
 eval_dataset = eval_dataset.map(preprocess_function, batched=True)
-test_dataset = test_dataset.map(preprocess_function, batched=True)
 
-train_dataset = train_dataset.remove_columns(["id", "highlights", "article"])
+train_dataset = train_dataset.remove_columns(["Summaries", "Articles",'File_path'])
 
 #%% Configurar los argumentos de entrenamiento
 
@@ -62,7 +64,7 @@ training_args = TrainingArguments(
 
 #%%
 trainer = Trainer(
-    model=peft_model,
+    model=base_model,
     args=training_args,
     train_dataset=train_dataset,
     eval_dataset=eval_dataset,
@@ -73,16 +75,16 @@ trainer = Trainer(
 trainer.train()
 
 #%% Guardar el modelo fine-tuned
-trainer.save_model("C:/Users/pablo/ModelosLLM/Bart-Lora-FT")
-tokenizer.save_pretrained("C:/Users/pablo/ModelosLLM/tokenizadorBart-Lora-FT")
+trainer.save_model("C:/Users/pablo/ModelosLLM/T5-Lora-FT")
+tokenizer.save_pretrained("C:/Users/pablo/ModelosLLM/tokenizadorT5-Lora-FT")
 
 # %%
 ## Vamos a compararlos usando la metrica ROUGE
 
 # Cargamos el modelo y el tokenizadpor si es necesario
 
-peft_model = AutoModelForSeq2SeqLM.from_pretrained("C:/Users/pablo/ModelosLLM/Bart-Lora-FT").to(device)
-tokenizer = AutoTokenizer.from_pretrained("C:/Users/pablo/ModelosLLM/tokenizadorBart-Lora-FT")
+peft_model = AutoModelForSeq2SeqLM.from_pretrained("C:/Users/pablo/ModelosLLM/T5-Lora-FT").to(device)
+tokenizer = AutoTokenizer.from_pretrained("C:/Users/pablo/ModelosLLM/tokenizadorT5-Lora-FT")
 
 
 # %%
@@ -92,14 +94,14 @@ from evaluate import load
 
 rouge = load("rouge",token=True)
 
-references = [example["highlights"] for example in eval_dataset]  
+references = [example["Summaries"] for example in eval_dataset]  
 
 # %%
 def compute_predictions(data, model, tokenizer, device):
     predictions = []
     
     for i in range(0, len(data)):
-        articles = "Sumarize this article:\n"+data["article"][i]+ "Summary:\n"
+        articles = "Sumarize this article:\n"+data["Articles"][i]+ "Summary:\n"
 
         inputs = tokenizer(
             articles,
@@ -126,11 +128,16 @@ def compute_predictions(data, model, tokenizer, device):
 
 predictions_lora = compute_predictions(eval_dataset,peft_model, tokenizer, device)
 rouge_lora = rouge.compute(predictions=predictions_lora, references=references)
+predictions_base = compute_predictions(eval_dataset,base_model, tokenizer, device)
+rouge_base = rouge.compute(predictions=predictions_base, references=references)
 print("ROUGE del Lora_model:", rouge_lora)
+print("ROUGE del base_model:", rouge_base)
 
+# %%
+article = "Sumarize this article:\nClimate change is one of the most pressing issues facing humanity today. Scientists have warned that rising global temperatures, caused by increased greenhouse gas emissions, could lead to catastrophic consequences such as extreme weather events, rising sea levels, and the loss of biodiversity. To combat this, countries around the world are adopting measures like transitioning to renewable energy sources, improving energy efficiency, and protecting forests. However, experts emphasize that individual actions, such as reducing waste and using public transportation, are also crucial in the fight against climate change. The time to act is now, as delaying action will only make the problem more difficult and expensive to solve.Summary:\n"
 
+print(generate_summary(eval_dataset[0]["Articles"],base_model))
+print("_"*100)
+print(generate_summary(eval_dataset[0]["Articles"],peft_model))
 
-
-
-
-
+# %%

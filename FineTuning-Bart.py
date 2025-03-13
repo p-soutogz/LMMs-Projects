@@ -142,6 +142,7 @@ def generate_summary(text,model):
     summary_ids = model.generate(
         **inputs,
         max_new_tokens=250,
+        min_new_tokens=50,
         num_return_sequences=1,
         do_sample=True,
         top_k=5
