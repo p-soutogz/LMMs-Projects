@@ -84,7 +84,7 @@ tokenizer.save_pretrained("C:/Users/pablo/ModelosLLM/tokenizadorT5-Lora-FT")
 # Cargamos el modelo y el tokenizadpor si es necesario
 
 peft_model = AutoModelForSeq2SeqLM.from_pretrained("C:/Users/pablo/ModelosLLM/T5-Lora-FT").to(device)
-tokenizer = AutoTokenizer.from_pretrained("C:/Users/pablo/ModelosLLM/tokenizadorT5-Lora-FT")
+peft_tokenizer = AutoTokenizer.from_pretrained("C:/Users/pablo/ModelosLLM/tokenizadorT5-Lora-FT")
 
 
 # %%
@@ -126,18 +126,11 @@ def compute_predictions(data, model, tokenizer, device):
 
 # %%
 
-predictions_lora = compute_predictions(eval_dataset,peft_model, tokenizer, device)
+predictions_lora = compute_predictions(eval_dataset,peft_model, peft_tokenizer, device)
 rouge_lora = rouge.compute(predictions=predictions_lora, references=references)
 predictions_base = compute_predictions(eval_dataset,base_model, tokenizer, device)
 rouge_base = rouge.compute(predictions=predictions_base, references=references)
 print("ROUGE del Lora_model:", rouge_lora)
 print("ROUGE del base_model:", rouge_base)
-
-# %%
-article = "Sumarize this article:\nClimate change is one of the most pressing issues facing humanity today. Scientists have warned that rising global temperatures, caused by increased greenhouse gas emissions, could lead to catastrophic consequences such as extreme weather events, rising sea levels, and the loss of biodiversity. To combat this, countries around the world are adopting measures like transitioning to renewable energy sources, improving energy efficiency, and protecting forests. However, experts emphasize that individual actions, such as reducing waste and using public transportation, are also crucial in the fight against climate change. The time to act is now, as delaying action will only make the problem more difficult and expensive to solve.Summary:\n"
-
-print(generate_summary(eval_dataset[0]["Articles"],base_model))
-print("_"*100)
-print(generate_summary(eval_dataset[0]["Articles"],peft_model))
 
 # %%

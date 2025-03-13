@@ -73,63 +73,8 @@ trainer = Trainer(
 trainer.train()
 
 #%% Guardar el modelo fine-tuned
-trainer.save_model("C:/Users/pablo/ModelosLLM/Bart-Lora-FT")
-tokenizer.save_pretrained("C:/Users/pablo/ModelosLLM/tokenizadorBart-Lora-FT")
-
-# %%
-## Vamos a compararlos usando la metrica ROUGE
-
-# Cargamos el modelo y el tokenizadpor si es necesario
-
-peft_model = AutoModelForSeq2SeqLM.from_pretrained("C:/Users/pablo/ModelosLLM/Bart-Lora-FT").to(device)
-tokenizer = AutoTokenizer.from_pretrained("C:/Users/pablo/ModelosLLM/tokenizadorBart-Lora-FT")
-
-
-# %%
-
-
-from evaluate import load
-
-rouge = load("rouge",token=True)
-
-references = [example["highlights"] for example in eval_dataset]  
-
-# %%
-def compute_predictions(data, model, tokenizer, device):
-    predictions = []
-    
-    for i in range(0, len(data)):
-        articles = "Sumarize this article:\n"+data["article"][i]+ "Summary:\n"
-
-        inputs = tokenizer(
-            articles,
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=1024
-        ).to(device)
-
-        summary_ids = model.generate(
-            **inputs,
-            max_new_tokens=250,
-            num_return_sequences=1,
-            do_sample=True,
-            top_k=5
-        )
-        
-        summaries = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
-        predictions.append(summaries)
-    
-    return predictions
-
-# %%
-
-predictions_lora = compute_predictions(eval_dataset,peft_model, tokenizer, device)
-rouge_lora = rouge.compute(predictions=predictions_lora, references=references)
-print("ROUGE del Lora_model:", rouge_lora)
-
-
-
+#trainer.save_model("C:/Users/pablo/ModelosLLM/Bart-Lora-FT")
+#tokenizer.save_pretrained("C:/Users/pablo/ModelosLLM/tokenizadorBart-Lora-FT")
 
 
 

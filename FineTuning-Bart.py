@@ -34,7 +34,7 @@ model_base.save_pretrained("C:/Users/pablo/ModelosLLM/Bart")
 tokenizer.save_pretrained("C:/Users/pablo/ModelosLLM/tokenizadorBart")
 
 # %%
-imput_text = "Sumarize this article:\nClimate change is one of the most pressing issues facing humanity today. Scientists have warned that rising global temperatures, caused by increased greenhouse gas emissions, could lead to catastrophic consequences such as extreme weather events, rising sea levels, and the loss of biodiversity. To combat this, countries around the world are adopting measures like transitioning to renewable energy sources, improving energy efficiency, and protecting forests. However, experts emphasize that individual actions, such as reducing waste and using public transportation, are also crucial in the fight against climate change. The time to act is now, as delaying action will only make the problem more difficult and expensive to solve.Summary:\n"
+imput_text = "Summarize this article:\nClimate change is one of the most pressing issues facing humanity today. Scientists have warned that rising global temperatures, caused by increased greenhouse gas emissions, could lead to catastrophic consequences such as extreme weather events, rising sea levels, and the loss of biodiversity. To combat this, countries around the world are adopting measures like transitioning to renewable energy sources, improving energy efficiency, and protecting forests. However, experts emphasize that individual actions, such as reducing waste and using public transportation, are also crucial in the fight against climate change. The time to act is now, as delaying action will only make the problem more difficult and expensive to solve.Summary:\n"
 imput = tokenizer(imput_text , return_tensors="pt").to(device)
 output = model_base.generate(
     **imput,     
@@ -45,36 +45,28 @@ response = tokenizer.decode(output[0])
 print(response)
 
 # %%
+#%% Cargar el dataset
 
 from datasets import load_dataset
 
-# Cargargamos el dataset 
+dataset = load_dataset('gopalkalpande/bbc-news-summary')
 
-dataset = load_dataset('abisee/cnn_dailymail', '3.0.0')
+dataset_barajado = dataset["train"].shuffle(seed=42)
+indices = int(0.8 * len(dataset_barajado))
 
-print(dataset)
+train_dataset = dataset_barajado.select(range(indices))    
+eval_dataset = dataset_barajado.select(range(indices, len(dataset_barajado)))
 
-train_dataset = dataset["train"]
-test_dataset = dataset["test"]
-eval_dataset = dataset["validation"]
-
-# Seleccionar una porción del dataset de entrenamiento
-
-train_dataset = train_dataset.select(range(int(0.01 * len(train_dataset))))
-test_dataset = test_dataset.select(range(int(0.01 * len(test_dataset))))
-eval_dataset = eval_dataset.select(range(int(0.01 * len(eval_dataset))))
-
-print(train_dataset)
 
 # %%
 
 def preprocess_function(examples):
     # Combinar el artículo y los highlights con un token especial
-    inputs = ["Summarize this article:\n "+ article + "Summary:\n" for article in examples["article"]]
+    inputs = ["Summarize this article:\n "+ article + "Summary:\n" for article in examples["Articles"]]
 
     # Tokenizar los inputs y los targets
     model_inputs = tokenizer(inputs, truncation=True,max_length=1024, padding="max_length",return_tensors="pt")
-    labels = tokenizer(examples["highlights"], truncation=True,max_length=250, padding="max_length",return_tensors="pt")
+    labels = tokenizer(examples["Summaries"], truncation=True,max_length=250, padding="max_length",return_tensors="pt")
 
     
     # Asignar los labels al diccionario de inputs
@@ -84,11 +76,9 @@ def preprocess_function(examples):
 
 # Aplicar la función de preprocesamiento al dataset
 train_dataset = train_dataset.map(preprocess_function, batched=True)
-eval_dataset = test_dataset.map(preprocess_function, batched=True)
-test_dataset = eval_dataset.map(preprocess_function, batched=True)
+eval_dataset = eval_dataset.map(preprocess_function, batched=True)
 
-
-data = train_dataset.remove_columns(["id", "highlights","article"])
+data = train_dataset.remove_columns(["File_path", "Summaries","Articles"])
 
 print(data)
 
@@ -127,17 +117,17 @@ trainer_base.train()
 # %%
 
 # Guardar el modelo 
-##model_base.save_pretrained("C:/Users/pablo/ModelosLLM/Bart-FT")
+model_base.save_pretrained("C:/Users/pablo/ModelosLLM/Bart-FT")
 # %%
 
 #Cargar el modelo
  
 model_FullFineTuning = AutoModelForSeq2SeqLM.from_pretrained("C:/Users/pablo/ModelosLLM/Bart-FT").to(device)
-tokenizer = AutoTokenizer.from_pretrained("C:/Users/pablo/ModelosLLM/tokenizadorBart-FT")
+tokenizer__FullFineTuning = AutoTokenizer.from_pretrained("C:/Users/pablo/ModelosLLM/tokenizadorBart-FT")
 
 # %%
 
-def generate_summary(text,model):
+def generate_summary(text,model,tokenizer,device):
     inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True).to(device)
     summary_ids = model.generate(
         **inputs,
@@ -152,8 +142,8 @@ def generate_summary(text,model):
 # %%
 article = "Sumarize this article:\nClimate change is one of the most pressing issues facing humanity today. Scientists have warned that rising global temperatures, caused by increased greenhouse gas emissions, could lead to catastrophic consequences such as extreme weather events, rising sea levels, and the loss of biodiversity. To combat this, countries around the world are adopting measures like transitioning to renewable energy sources, improving energy efficiency, and protecting forests. However, experts emphasize that individual actions, such as reducing waste and using public transportation, are also crucial in the fight against climate change. The time to act is now, as delaying action will only make the problem more difficult and expensive to solve.Summary:\n"
 
-print(generate_summary(article,model_base))
-print(generate_summary(article,model_FullFineTuning))
+print(generate_summary(article,model_base,tokenizer,device))
+print(generate_summary(article,model_FullFineTuning,tokenizer__FullFineTuning,device))
 
 # %%
 #Vamos ahora a comparar la eficacia de los dos modelos sobre el dataset de evaluacion usando Trainer
@@ -166,68 +156,13 @@ trainer_ft = Trainer(
 )
 # %%
 
-results_base_model = trainer_base.evaluate(test_dataset)
-results_ft_model = trainer_ft.evaluate(test_dataset)
+results_base_model = trainer_base.evaluate(eval_dataset)
+results_ft_model = trainer_ft.evaluate(eval_dataset)
 
 print("Resultados modelo base:\n")
 print(results_base_model)
 print("Resultdos modelo finetuning:\n")
 print(results_ft_model)
-
-
-
-# %%
-## Vamos a compararlos usando la metrica ROUGE
-
-from evaluate import load
-
-eval_data = eval_dataset.select(range(50))
-
-rouge = load("rouge",token=True)
-
-references = [example["highlights"] for example in eval_data]  
-
-# %%
-def compute_predictions(data, model, tokenizer, device):
-    predictions = []
-    
-    for i in range(0, len(data)):
-        articles = "Sumarize this article:\n"+data["article"][i]+ "Summary:\n"
-
-        inputs = tokenizer(
-            articles,
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=512
-        ).to(device)
-
-        summary_ids = model.generate(
-            **inputs,
-            max_new_tokens=250,
-            num_return_sequences=1,
-            do_sample=True,
-            top_k=5
-        )
-        
-        summaries = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
-        predictions.append(summaries)
-    
-    return predictions
-
-
-# %%
-predictions_base = compute_predictions(eval_data,model_base, tokenizer, device)
-rouge_base = rouge.compute(predictions=predictions_base, references=references)
-print("ROUGE del modelo base:", rouge_base)
-
-
-# %%
-
-predictions_tf = compute_predictions(eval_data,model_FullFineTuning, tokenizer, device)
-rouge_ft = rouge.compute(predictions=predictions_tf, references=references)
-print("ROUGE del modelo fine-tuneado:", rouge_ft)
-
 
 
 

@@ -25,43 +25,57 @@ indices = int(0.8 * len(dataset_barajado))
 train_dataset = dataset_barajado.select(range(indices))    
 eval_dataset = dataset_barajado.select(range(indices, len(dataset_barajado)))
 
-#%%
-# Cargamos el modelo y el tokenizadpor si es necesario
-
-FT_model = AutoModelForCausalLM.from_pretrained("C:/Users/pablo/ModelosLLM/GPT2-FT").to(device)
-FT_tokenizer = AutoTokenizer.from_pretrained("C:/Users/pablo/ModelosLLM/tokenizadorGPT2-FT")
-
-# %%
-
-def generate_summary(text,model, tokenizer, device):
-    articles = "Summarize this article:\n"+text+"Summary:\n"
-    inputs = tokenizer(
-        articles,
-        return_tensors="pt",
-        padding=True,
+#%% Función de preprocesamiento
+def preprocess_function(examples):
+    inputs = [
+        "Summarize this article:\n" + article + "\nSummary:\n" + summary
+        for article, summary in zip(examples["Articles"], examples["Summaries"])
+    ]
+    model_inputs = tokenizer(
+        inputs,
         truncation=True,
-        max_length=1024
-        ).to(device)
-    
-    input_length = inputs["input_ids"].shape[1]
-    
-    summary_ids = model.generate(
-        **inputs,
-        max_new_tokens=250,
-        num_return_sequences=1,
-        do_sample=True,
-        top_k=5
+        max_length=1024,
+        padding="max_length",
+        return_tensors="pt",
     )
-    generated_ids = summary_ids[:, input_length:]
-    
-    summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
-    return summary
-# %%
+    model_inputs["labels"] = model_inputs["input_ids"].clone()
+    for i, input_text in enumerate(inputs):
+           summary_start = input_text.find("\nSummary:\n") + len("\nSummary:\n")
+           prompt_length = len(tokenizer(input_text[:summary_start], return_tensors="pt")["input_ids"][0])
+           model_inputs["labels"][i, :prompt_length] = -100
+    return model_inputs
+#%% Aplicar preprocesamiento
+train_dataset = train_dataset.map(preprocess_function, batched=True)
+eval_dataset = eval_dataset.map(preprocess_function, batched=True)
 
+train_dataset = train_dataset.remove_columns(["Summaries", "Articles",'File_path'])
 
-article = "Climate change is one of the most pressing issues facing humanity today. Scientists have warned that rising global temperatures, caused by increased greenhouse gas emissions, could lead to catastrophic consequences such as extreme weather events, rising sea levels, and the loss of biodiversity. To combat this, countries around the world are adopting measures like transitioning to renewable energy sources, improving energy efficiency, and protecting forests. However, experts emphasize that individual actions, such as reducing waste and using public transportation, are also crucial in the fight against climate change."
-print(generate_summary(article,base_model,tokenizer, device))
-print("_"*100)
-print(generate_summary(article,FT_model,FT_tokenizer, device))
-print(article)
+#%% Configurar los argumentos de entrenamiento
+
+training_args = TrainingArguments(      
+    evaluation_strategy="epoch",    
+    learning_rate=3e-5,               
+    per_device_train_batch_size=4,   
+    per_device_eval_batch_size=4,  
+    num_train_epochs=2,             
+    weight_decay=0.01,              
+    save_total_limit=2,             
+    fp16=torch.cuda.is_available(),  
+)
+
+#%%
+trainer = Trainer(
+    model=base_model,
+    args=training_args,
+    train_dataset=train_dataset,
+    eval_dataset=eval_dataset,
+    tokenizer=tokenizer,
+)
+
+#%% Entrenar el modelo
+trainer.train()
+
+#%% Guardar el modelo fine-tuned
+#trainer.save_model("C:/Users/pablo/ModelosLLM/GPT2-FT")
+#tokenizer.save_pretrained("C:/Users/pablo/ModelosLLM/tokenizadorGPT2-FT")
 
