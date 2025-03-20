@@ -9,18 +9,18 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 print("Devise = ",device)
 
-model_name = "facebook/bart-large-cnn"
+model_name = "openai-community/gpt2"
 
-FT_model_path="C:/Users/pablo/ModelosLLM/Bart-FT"
-tokenizer_FT_path="C:/Users/pablo/ModelosLLM/tokenizadorBart-FT"
+FT_model_path="C:/Users/pablo/ModelosLLM/GPT2-FT"
+tokenizer_FT_path="C:/Users/pablo/ModelosLLM/tokenizadorGPT2-FT"
 
-lora_model_path="C:/Users/pablo/ModelosLLM/Bart-Lora-FT"
-tokenizer_Lora_path="C:/Users/pablo/ModelosLLM/tokenizadorBart-Lora-FT"
+lora_model_path="C:/Users/pablo/ModelosLLM/GPT2-Lora-FT"
+tokenizer_Lora_path="C:/Users/pablo/ModelosLLM/tokenizadorGPT2-Lora-FT"
 
 
 #%% Cargar los tokenizadores y los modelos
 
-base_model = AutoModelForSeq2SeqLM.from_pretrained(model_name).to(device)
+base_model = AutoModelForCausalLM.from_pretrained(model_name).to(device)
 base_tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 #Definimos un token para el padding

@@ -3,9 +3,11 @@
 from transformers import GPT2LMHeadModel, GPT2Tokenizer, Trainer, TrainingArguments,AutoModelForCausalLM, AutoTokenizer
 from datasets import load_dataset
 import torch
+import time
 
 #%% Cargar el tokenizador y el modelo
 device = "cuda" if torch.cuda.is_available() else "cpu"
+
 print("Device = ", device)
 
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
@@ -19,11 +21,15 @@ base_model.config.pad_token_id = tokenizer.pad_token_id
 #%% Cargar el dataset
 dataset = load_dataset('gopalkalpande/bbc-news-summary')
 
-dataset_barajado = dataset["train"].shuffle(seed=42)
-indices = int(0.8 * len(dataset_barajado))
+split_dataset = dataset["train"].train_test_split(
+    test_size=0.2,
+    shuffle=True,
+    seed=42
+)
 
-train_dataset = dataset_barajado.select(range(indices))    
-eval_dataset = dataset_barajado.select(range(indices, len(dataset_barajado)))
+train_dataset = split_dataset["train"].select(range(int(0.1 * len(split_dataset["train"]))))
+eval_dataset = split_dataset["test"].select(range(int(0.1 * len(split_dataset["test"]))))
+
 
 #%% Función de preprocesamiento
 def preprocess_function(examples):
@@ -44,6 +50,7 @@ def preprocess_function(examples):
            prompt_length = len(tokenizer(input_text[:summary_start], return_tensors="pt")["input_ids"][0])
            model_inputs["labels"][i, :prompt_length] = -100
     return model_inputs
+
 #%% Aplicar preprocesamiento
 train_dataset = train_dataset.map(preprocess_function, batched=True)
 eval_dataset = eval_dataset.map(preprocess_function, batched=True)
@@ -57,10 +64,10 @@ training_args = TrainingArguments(
     learning_rate=3e-5,               
     per_device_train_batch_size=4,   
     per_device_eval_batch_size=4,  
-    num_train_epochs=2,             
+    num_train_epochs=1,             
     weight_decay=0.01,              
     save_total_limit=2,             
-    fp16=torch.cuda.is_available(),  
+    fp16=torch.cuda.is_available()
 )
 
 #%%
@@ -73,9 +80,18 @@ trainer = Trainer(
 )
 
 #%% Entrenar el modelo
+start_time = time.time() 
 trainer.train()
+end_time = time.time()  
 
-#%% Guardar el modelo fine-tuned
-#trainer.save_model("C:/Users/pablo/ModelosLLM/GPT2-FT")
-#tokenizer.save_pretrained("C:/Users/pablo/ModelosLLM/tokenizadorGPT2-FT")
+training_duration = end_time - start_time
+
+with open("resultados_entrenamiento_GPT2_FFT_GPU.txt", "w") as archivo:
+    archivo.write(f"\nTiempo total de entrenamiento: {training_duration:.2f} segundos\n")
+    archivo.write(f"Tiempo por época: {training_duration/training_args.num_train_epochs:.2f} segundos\n")
+
+
+#%% Guardar el modelo fine-tuned(Modifica tu la ruta)
+trainer.save_model("C:/Users/pablo/ModelosLLM/GPT2-FT")
+tokenizer.save_pretrained("C:/Users/pablo/ModelosLLM/tokenizadorGPT2-FT")
 
