@@ -34,8 +34,13 @@ FT_model = AutoModelForCausalLM.from_pretrained(FT_model_path).to(device)
 FT_tokenizer = AutoTokenizer.from_pretrained(tokenizer_FT_path)
 
 
-lora_model = PeftModel.from_pretrained(base_model, lora_model_path).to(device)
+##lora_model = PeftModel.from_pretrained(base_model, lora_model_path).to(device)
 lora_tokenizer = AutoTokenizer.from_pretrained(tokenizer_Lora_path)
+
+#%%
+lora_model = PeftModel.from_pretrained(base_model, lora_model_path)
+lora_model = lora_model.merge_and_unload()  # Merge adapters into the base model
+lora_model.to(device)
 
 #%% Cargar el dataset
 dataset = load_dataset('gopalkalpande/bbc-news-summary')
@@ -50,6 +55,7 @@ eval_dataset = dataset_barajado.select(range(indices, len(dataset_barajado)))
 
 def compute_predictions_gpt2(data, model, tokenizer, device):
     predictions = []
+    model.eval()
     
     for i in range(0, len(data)):
         articles = "Summarize this article:\n"+data["Articles"][i]+ "Summary:\n"
@@ -79,7 +85,7 @@ def compute_predictions_gpt2(data, model, tokenizer, device):
 #%%
 def compute_predictions_bart(data, model, tokenizer, device):
     predictions = []
-    
+    model.eval()
     for i in range(0, len(data)):
         articles = "Sumarize this article:\n"+data["Articles"][i]+ "Summary:\n"
 
@@ -115,7 +121,7 @@ def rouge_evaluate(data, model, tokenizer, device,compute_predictions,references
 
 #%%
 
-data = eval_dataset.select(range(4))
+data = eval_dataset.select(range(6))
 
 references = [example["Summaries"] for example in data]  
 
