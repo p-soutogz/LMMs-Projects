@@ -142,4 +142,4 @@ for artist_url in artists:
     else:
         print(f"No se encontraron obras con descripción para {artist_url}")
 
-print("\n✅ Proceso terminado. Todas las obras han sido añadidas progresivamente a all_artists_paintings.csv")
+print("\nTodas las obras han sido añadidas a all_artists_paintings.csv")
