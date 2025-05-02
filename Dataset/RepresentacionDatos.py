@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 import os
 
 # Cargar el dataset unificado o crear uno vacío si no existe
-if os.path.exists('all_artists_paintings.csv'):
-    df = pd.read_csv('all_artists_paintings.csv')
+if os.path.exists('all_artists_paintings2.csv'):
+    df = pd.read_csv('all_artists_paintings2.csv')
 else:
     df = pd.DataFrame(columns=['title', 'artist_name', 'style', 'genre', 'description'])
 
@@ -12,7 +12,7 @@ else:
 if not df.empty:
     echo_df_head = df.head(5)
     print("Primeras 5 obras cargadas:")
-    print(echo_df_head[['artist_name', 'title']])
+    print(echo_df_head[['artist_name', 'title','description']])
 
     # Mostrar las últimas 5 obras cargadas
     echo_df_tail = df.tail(5)
@@ -66,3 +66,4 @@ if not df.empty:
     plt.show()
 else:
     print("El dataset está vacío. No hay datos para representar.")
+
