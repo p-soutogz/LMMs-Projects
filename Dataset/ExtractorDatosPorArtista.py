@@ -51,7 +51,7 @@ def get_paintings_with_description(artist_slug):
         painting = get_painting_details(cid)
         if painting and painting['description']:
             paintings_with_desc.append(painting)
-        time.sleep(0.2)
+        time.sleep(0.01)
     return paintings_with_desc
 
 # --- CONFIGURACIÓN ---
